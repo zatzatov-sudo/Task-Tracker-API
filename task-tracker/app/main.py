@@ -44,8 +44,9 @@ def create_task(payload: TaskCreate) -> TaskResponse:
 def list_tasks(
     status: TaskStatus | None = None,
     priority: TaskPriority | None = None,
+    tag: str | None = None,
 ) -> list[TaskResponse]:
-    return storage.get_all_tasks(status=status, priority=priority)
+    return storage.get_all_tasks(status=status, priority=priority, tag=tag)
 
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])

@@ -367,18 +367,67 @@
   cursor: pointer;
 }
 
+.task-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+#tagFilterInput {
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--surface);
+  width: 180px;
+}
+
+#tagFilterInput:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
   </style>
 </head>
 <body>
   <header class="app-header">
   <div class="header-row">
-    <div>
-      <p class="eyebrow">Task Tracker</p>
-      <h1>Kanban Board</h1>
-      <p class="subtitle">A simple task board to plan, track, and complete work.</p>
-    </div>
+  <div>
+    <p class="eyebrow">Task Tracker</p>
+    <h1>Kanban Board</h1>
+    <p class="subtitle">A simple task board to plan, track, and complete work.</p>
+  </div>
+  <div class="header-actions">
+    <input
+      type="search"
+      id="tagFilterInput"
+      placeholder="Filter by tag..."
+      aria-label="Filter tasks by tag"
+    />
     <button type="button" class="new-task-button" id="newTaskButton">New Task</button>
   </div>
+</div>
 </header>
 
   <main class="board" aria-label="Task tracker board">
@@ -486,6 +535,12 @@
         <input type="text" id="taskAssignee" name="assignee" placeholder="Unassigned" />
       </div>
 
+      <div class="form-field">
+         <label for="taskTags">Tags</label>
+         <input type="text" id="taskTags" name="tags" placeholder="e.g. bug, frontend, urgent" />
+        <p style="margin:0;font-size:0.8rem;color:var(--muted);">Comma-separated. Each tag max 32 characters, up to 10 tags.</p>
+</div>
+
       <div class="modal-actions">
         <button type="button" class="cancel-button" id="modalCancelButton">Cancel</button>
         <button type="submit" class="save-button" id="modalSaveButton">Save</button>
@@ -532,10 +587,15 @@
   const assignee = escapeHtml(task.assignee || 'Unassigned');
   const taskId = escapeHtml(task.id);
 
+  const tagsHtml = Array.isArray(task.tags) && task.tags.length > 0
+    ? `<div class="task-tags">${task.tags.map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('')}</div>`
+    : '';
+
   return `
     <article class="task-card" data-task-id="${taskId}" draggable="true">
       <h3 class="task-title">${title}</h3>
       ${description ? `<p class="task-description">${description}</p>` : ''}
+      ${tagsHtml}
       <div class="task-meta">
         <span class="task-priority ${priorityClass}">${priority}</span>
         <span class="task-assignee">${assignee}</span>
@@ -728,7 +788,8 @@ function getModalElements() {
     descriptionField: document.getElementById('taskDescription'),
     statusField: document.getElementById('taskStatus'),
     priorityField: document.getElementById('taskPriority'),
-    assigneeField: document.getElementById('taskAssignee')
+    assigneeField: document.getElementById('taskAssignee'),
+    tagsField: document.getElementById('taskTags')
   };
 }
 
@@ -753,6 +814,7 @@ function openCreateModal() {
   el.statusField.value = 'ToDo';
   el.priorityField.value = 'Medium';
   el.assigneeField.value = '';
+  el.tagsField.value = '';
 
   el.overlay.hidden = false;
   el.titleField.focus();
@@ -774,6 +836,7 @@ function openEditModal(taskId) {
   el.statusField.value = task.status;
   el.priorityField.value = task.priority;
   el.assigneeField.value = task.assignee || '';
+  el.tagsField.value = task.tags ? task.tags.join(', ') : '';
 
   el.overlay.hidden = false;
   el.titleField.focus();
@@ -804,11 +867,17 @@ async function handleModalSubmit(event) {
 
   const trimmedAssignee = el.assigneeField.value.trim();
 
+  const rawTags = el.tagsField.value
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
   const payload = {
     title: trimmedTitle,
     description: el.descriptionField.value.trim(),
     priority: el.priorityField.value,
-    assignee: trimmedAssignee === '' ? null : trimmedAssignee
+    assignee: trimmedAssignee === '' ? null : trimmedAssignee,
+    tags: rawTags
   };
 
   const statusChanged = modalMode === 'create' || el.statusField.value !== originalTaskStatus;
@@ -976,8 +1045,17 @@ function setupDragAndDrop() {
   }
 
   setupDragAndDrop();
-  setupModal();
-  fetchTasks();
+setupModal();
+fetchTasks();
+
+document.getElementById('tagFilterInput').addEventListener('input', (event) => {
+  const query = event.target.value.trim().toLowerCase();
+  const filtered = query
+    ? tasks.filter((t) => t.tags.includes(query))
+    : tasks;
+  renderBoard(filtered, filtered.length === 0 ? 'empty' : 'ready');
+});
+
 </script>
 
 </body>

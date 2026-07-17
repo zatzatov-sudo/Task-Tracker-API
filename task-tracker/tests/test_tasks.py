@@ -124,3 +124,86 @@ def test_delete_existing_returns_204_no_body(client, created_task):
 def test_delete_missing_returns_404(client):
     response = client.delete("/tasks/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
+
+
+# --- Tags ---
+
+def test_create_task_with_tags_returns_normalized_tags(client):
+    response = client.post("/tasks", json={"title": "Tagged task", "tags": ["Bug", " Frontend ", "bug"]})
+    assert response.status_code == 201
+    body = response.json()
+    # "Bug" and "bug" deduplicate to one; " Frontend " strips to "frontend"
+    assert body["tags"] == ["bug", "frontend"]
+
+
+def test_create_task_without_tags_returns_empty_list(client):
+    response = client.post("/tasks", json={"title": "No tags"})
+    assert response.status_code == 201
+    assert response.json()["tags"] == []
+
+
+def test_create_task_blank_tag_is_dropped(client):
+    response = client.post("/tasks", json={"title": "Blank tag", "tags": ["bug", "  ", "frontend"]})
+    assert response.status_code == 201
+    assert response.json()["tags"] == ["bug", "frontend"]
+
+
+def test_create_task_tag_too_long_returns_422(client):
+    long_tag = "a" * 33
+    response = client.post("/tasks", json={"title": "Long tag", "tags": [long_tag]})
+    assert response.status_code == 422
+
+
+def test_create_task_too_many_tags_returns_422(client):
+    tags = [f"tag{i}" for i in range(11)]
+    response = client.post("/tasks", json={"title": "Too many tags", "tags": tags})
+    assert response.status_code == 422
+
+
+def test_patch_replaces_tags(client, created_task):
+    response = client.patch(
+        f"/tasks/{created_task['id']}",
+        json={"tags": ["backend", "urgent"]}
+    )
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["backend", "urgent"]
+
+
+def test_patch_clears_tags_with_empty_list(client):
+    create = client.post("/tasks", json={"title": "Has tags", "tags": ["bug"]})
+    task_id = create.json()["id"]
+    response = client.patch(f"/tasks/{task_id}", json={"tags": []})
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+
+def test_patch_omitting_tags_preserves_existing_tags(client):
+    create = client.post("/tasks", json={"title": "Keep tags", "tags": ["bug"]})
+    task_id = create.json()["id"]
+    response = client.patch(f"/tasks/{task_id}", json={"title": "Updated title"})
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["bug"]
+
+
+def test_list_tasks_filter_by_tag_returns_only_matches(client):
+    client.post("/tasks", json={"title": "Task A", "tags": ["bug"]})
+    client.post("/tasks", json={"title": "Task B", "tags": ["frontend"]})
+    response = client.get("/tasks", params={"tag": "bug"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Task A"
+
+
+def test_list_tasks_filter_by_tag_case_insensitive(client):
+    client.post("/tasks", json={"title": "Task A", "tags": ["bug"]})
+    response = client.get("/tasks", params={"tag": "BUG"})
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_list_tasks_filter_by_tag_no_match_returns_empty(client):
+    client.post("/tasks", json={"title": "Task A", "tags": ["bug"]})
+    response = client.get("/tasks", params={"tag": "nonexistent"})
+    assert response.status_code == 200
+    assert response.json() == []

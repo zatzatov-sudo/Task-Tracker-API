@@ -17,6 +17,7 @@ def add_task(payload: TaskCreate) -> TaskResponse:
         status=payload.status,
         priority=payload.priority,
         assignee=payload.assignee,
+        tags=payload.tags,
         created_at=now,
         updated_at=now,
     )
@@ -27,12 +28,15 @@ def add_task(payload: TaskCreate) -> TaskResponse:
 def get_all_tasks(
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
+    tag: Optional[str] = None,
 ) -> list[TaskResponse]:
     tasks = list(_tasks.values())
     if status is not None:
-        tasks = [task for task in tasks if task.status == status]
+        tasks = [t for t in tasks if t.status == status]
     if priority is not None:
-        tasks = [task for task in tasks if task.priority == priority]
+        tasks = [t for t in tasks if t.priority == priority]
+    if tag is not None:
+        tasks = [t for t in tasks if tag.strip().lower() in t.tags]
     return tasks
 
 
