@@ -32,6 +32,16 @@ A minimal learning-project REST API built with **FastAPI** and **Pydantic**, usi
 - Tag chips rendered on each card in the UI
 - Live client-side tag filter in the board header
 
+### Search + Combined Filters
+- Free-text search across task title and description via `GET /tasks?search=login`
+- All filters combinable in a single request with AND logic:
+  `GET /tasks?status=ToDo&priority=High&tag=bug&search=login`
+- Empty or whitespace-only search treated as no filter
+- Invalid enum values (`status`, `priority`) return 422 automatically
+- Frontend: compact four-input filter bar (search, status, priority, tag)
+- Filters trigger an API call on every change — server is always source of truth
+- Empty filter results show the empty state banner with columns still visible
+
 ### Frontend
 - Kanban board with three columns: To Do, In Progress, Done
 - Four UI states: loading, ready, empty, error (with retry)

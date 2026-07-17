@@ -29,6 +29,7 @@ def get_all_tasks(
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
     tag: Optional[str] = None,
+    search: Optional[str] = None,
 ) -> list[TaskResponse]:
     tasks = list(_tasks.values())
     if status is not None:
@@ -37,6 +38,14 @@ def get_all_tasks(
         tasks = [t for t in tasks if t.priority == priority]
     if tag is not None:
         tasks = [t for t in tasks if tag.strip().lower() in t.tags]
+    if search is not None:
+        query = search.strip().lower()
+        if query:
+            tasks = [
+                t for t in tasks
+                if query in t.title.lower()
+                or query in (t.description or "").lower()
+            ]
     return tasks
 
 

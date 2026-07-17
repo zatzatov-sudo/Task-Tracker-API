@@ -45,8 +45,9 @@ def list_tasks(
     status: TaskStatus | None = None,
     priority: TaskPriority | None = None,
     tag: str | None = None,
+    search: str | None = None,
 ) -> list[TaskResponse]:
-    return storage.get_all_tasks(status=status, priority=priority, tag=tag)
+    return storage.get_all_tasks(status=status, priority=priority, tag=tag, search=search)
 
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])

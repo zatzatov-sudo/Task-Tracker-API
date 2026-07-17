@@ -392,7 +392,15 @@
   flex-shrink: 0;
 }
 
-#tagFilterInput {
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.filter-bar input,
+.filter-bar select {
   font-family: inherit;
   font-size: 0.9rem;
   padding: 0.55rem 0.75rem;
@@ -400,12 +408,32 @@
   border: 1px solid var(--border);
   color: var(--text);
   background: var(--surface);
-  width: 180px;
 }
 
-#tagFilterInput:focus {
+.filter-bar input[type="search"] {
+  width: 200px;
+}
+
+.filter-bar select {
+  width: 140px;
+}
+
+.filter-bar input:focus,
+.filter-bar select:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+@media (max-width: 900px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-bar input[type="search"],
+  .filter-bar select {
+    width: 100%;
+  }
 }
 
   </style>
@@ -419,14 +447,34 @@
     <p class="subtitle">A simple task board to plan, track, and complete work.</p>
   </div>
   <div class="header-actions">
+  <div class="filter-bar">
+    <input
+      type="search"
+      id="searchInput"
+      placeholder="Search title or description..."
+      aria-label="Search tasks"
+    />
+    <select id="statusFilter" aria-label="Filter by status">
+      <option value="">All statuses</option>
+      <option value="ToDo">To Do</option>
+      <option value="InProgress">In Progress</option>
+      <option value="Done">Done</option>
+    </select>
+    <select id="priorityFilter" aria-label="Filter by priority">
+      <option value="">All priorities</option>
+      <option value="High">High</option>
+      <option value="Medium">Medium</option>
+      <option value="Low">Low</option>
+    </select>
     <input
       type="search"
       id="tagFilterInput"
       placeholder="Filter by tag..."
-      aria-label="Filter tasks by tag"
+      aria-label="Filter by tag"
     />
-    <button type="button" class="new-task-button" id="newTaskButton">New Task</button>
   </div>
+  <button type="button" class="new-task-button" id="newTaskButton">New Task</button>
+</div>
 </div>
 </header>
 
@@ -1048,12 +1096,53 @@ function setupDragAndDrop() {
 setupModal();
 fetchTasks();
 
+const activeFilters = {
+  search: '',
+  status: '',
+  priority: '',
+  tag: ''
+};
+
+async function applyFilters() {
+  const params = new URLSearchParams();
+  if (activeFilters.search) params.set('search', activeFilters.search);
+  if (activeFilters.status) params.set('status', activeFilters.status);
+  if (activeFilters.priority) params.set('priority', activeFilters.priority);
+  if (activeFilters.tag) params.set('tag', activeFilters.tag);
+
+  try {
+    const url = `${API_BASE_URL}/tasks${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    const loadedTasks = await response.json();
+    tasks.splice(0, tasks.length, ...loadedTasks);
+    renderBoard(tasks, tasks.length === 0 ? 'empty' : 'ready');
+  } catch (error) {
+    console.error('Failed to apply filters:', error);
+    renderBoard(tasks, 'error');
+  }
+}
+
+document.getElementById('searchInput').addEventListener('input', (event) => {
+  activeFilters.search = event.target.value.trim();
+  applyFilters();
+});
+
+document.getElementById('statusFilter').addEventListener('change', (event) => {
+  activeFilters.status = event.target.value;
+  applyFilters();
+});
+
+document.getElementById('priorityFilter').addEventListener('change', (event) => {
+  activeFilters.priority = event.target.value;
+  applyFilters();
+});
+
 document.getElementById('tagFilterInput').addEventListener('input', (event) => {
-  const query = event.target.value.trim().toLowerCase();
-  const filtered = query
-    ? tasks.filter((t) => t.tags.includes(query))
-    : tasks;
-  renderBoard(filtered, filtered.length === 0 ? 'empty' : 'ready');
+  activeFilters.tag = event.target.value.trim();
+  applyFilters();
 });
 
 </script>

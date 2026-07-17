@@ -207,3 +207,130 @@ def test_list_tasks_filter_by_tag_no_match_returns_empty(client):
     response = client.get("/tasks", params={"tag": "nonexistent"})
     assert response.status_code == 200
     assert response.json() == []
+
+
+# --- Search + Combined Filters ---
+
+def test_search_matches_title(client):
+    client.post("/tasks", json={"title": "Fix login bug", "description": ""})
+    client.post("/tasks", json={"title": "Write documentation", "description": ""})
+    response = client.get("/tasks", params={"search": "login"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Fix login bug"
+
+
+def test_search_matches_description(client):
+    client.post("/tasks", json={"title": "Task A", "description": "Update the login flow"})
+    client.post("/tasks", json={"title": "Task B", "description": "Write unit tests"})
+    response = client.get("/tasks", params={"search": "login"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Task A"
+
+
+def test_search_is_case_insensitive(client):
+    client.post("/tasks", json={"title": "Fix Login Bug", "description": ""})
+    response = client.get("/tasks", params={"search": "login"})
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_search_no_match_returns_200_and_empty_list(client):
+    client.post("/tasks", json={"title": "Fix login bug", "description": ""})
+    response = client.get("/tasks", params={"search": "nonexistent"})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_search_empty_string_returns_all_tasks(client):
+    client.post("/tasks", json={"title": "Task A", "description": ""})
+    client.post("/tasks", json={"title": "Task B", "description": ""})
+    response = client.get("/tasks", params={"search": ""})
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_search_whitespace_only_returns_all_tasks(client):
+    client.post("/tasks", json={"title": "Task A", "description": ""})
+    response = client.get("/tasks", params={"search": "   "})
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_combine_status_and_priority(client):
+    client.post("/tasks", json={"title": "Task A", "status": "ToDo", "priority": "High"})
+    client.post("/tasks", json={"title": "Task B", "status": "ToDo", "priority": "Low"})
+    client.post("/tasks", json={"title": "Task C", "status": "InProgress", "priority": "High"})
+    response = client.get("/tasks", params={"status": "ToDo", "priority": "High"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Task A"
+
+
+def test_combine_status_and_search(client):
+    client.post("/tasks", json={"title": "Fix login bug", "status": "ToDo"})
+    client.post("/tasks", json={"title": "Fix logout bug", "status": "InProgress"})
+    response = client.get("/tasks", params={"status": "ToDo", "search": "login"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Fix login bug"
+
+
+def test_combine_priority_and_tag(client):
+    client.post("/tasks", json={"title": "Task A", "priority": "High", "tags": ["bug"]})
+    client.post("/tasks", json={"title": "Task B", "priority": "Low", "tags": ["bug"]})
+    client.post("/tasks", json={"title": "Task C", "priority": "High", "tags": ["frontend"]})
+    response = client.get("/tasks", params={"priority": "High", "tag": "bug"})
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Task A"
+
+
+def test_combine_all_filters(client):
+    client.post("/tasks", json={
+        "title": "Fix login bug",
+        "description": "critical issue",
+        "status": "ToDo",
+        "priority": "High",
+        "tags": ["bug"]
+    })
+    client.post("/tasks", json={
+        "title": "Fix login bug",
+        "description": "minor issue",
+        "status": "ToDo",
+        "priority": "Low",
+        "tags": ["bug"]
+    })
+    response = client.get("/tasks", params={
+        "status": "ToDo",
+        "priority": "High",
+        "tag": "bug",
+        "search": "critical"
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["description"] == "critical issue"
+
+
+def test_invalid_status_filter_returns_422(client):
+    response = client.get("/tasks", params={"status": "NotAStatus"})
+    assert response.status_code == 422
+
+
+def test_invalid_priority_filter_returns_422(client):
+    response = client.get("/tasks", params={"priority": "NotAPriority"})
+    assert response.status_code == 422
+
+
+def test_combined_filters_no_match_returns_200_and_empty_list(client):
+    client.post("/tasks", json={"title": "Task A", "status": "ToDo", "priority": "Low"})
+    response = client.get("/tasks", params={"status": "ToDo", "priority": "High"})
+    assert response.status_code == 200
+    assert response.json() == []    
