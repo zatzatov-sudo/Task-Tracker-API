@@ -86,9 +86,63 @@ CRUD endpoints, storage logic, authentication, and the frontend are intentionall
 ```
    (On Windows PowerShell: `Copy-Item .env.example .env`)
 
-## Running the Server
+## How to Run the Project
 
-Start the development server with auto-reload enabled:
+### Prerequisites
+
+- Python 3.10 or higher
+- `pip`
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/zatzatov-sudo/Task-Tracker-API.git
+cd Task-Tracker-API
+```
+
+### 2. Create and activate a virtual environment
+
+**macOS/Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+**Windows PowerShell:**
+```powershell
+python -m venv venv
+venv\Scripts\Activate.ps1
+```
+
+> If PowerShell blocks the activation script with an execution policy error, run this once first:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Copy the environment file
+
+**macOS/Linux:**
+```bash
+cp .env.example .env
+```
+
+**Windows PowerShell:**
+```powershell
+Copy-Item .env.example .env
+```
+
+---
+
+## Running the Backend
+
+From the project root, with the virtual environment active:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
@@ -96,29 +150,93 @@ uvicorn app.main:app --reload --port 8000
 
 The API will be available at `http://127.0.0.1:8000`.
 
-## Testing the Health Endpoint
+You should see:
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.
 
-Use `curl` to verify the server is running:
+Keep this terminal open while using the app — press `Ctrl+C` to stop the server.
+
+### Verify the backend is running
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Expected response shape:
-
+Expected response:
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-07-05T12:34:56.789012+00:00"
+  "timestamp": "2026-07-18T..."
 }
 ```
 
-## API Documentation (Swagger UI)
+### Swagger UI (interactive API docs)
 
-Once the server is running, open your browser to:
+With the server running, open your browser to:
 http://127.0.0.1:8000/docs
 
-This provides interactive, auto-generated API documentation courtesy of FastAPI.
+All endpoints are listed and testable directly from the browser.
+
+---
+
+## Opening the Frontend
+
+The frontend is a single static HTML file — no build step required.
+
+1. Make sure the backend is running (see above)
+2. Open this file directly in your browser:
+task-tracker/frontend/index.html
+
+**Windows:** navigate to the file in File Explorer and double-click it, or drag it into a browser tab.
+
+**macOS/Linux:**
+```bash
+open frontend/index.html
+```
+
+The Kanban board will load and fetch tasks automatically from `http://localhost:8000`.
+
+> **Note:** The frontend communicates with the backend via `fetch()`. CORS is enabled on the backend for local development, so opening the file via `file://` works without a local web server.
+
+---
+
+## Running the Tests
+
+Tests use `pytest` with FastAPI's `TestClient` — no running server needed, the test client handles everything in-process.
+
+From the project root, with the virtual environment active:
+
+```bash
+pytest
+```
+
+For verbose output showing each test name and result:
+
+```bash
+pytest -v
+```
+
+### Expected output
+collected 28 items
+tests/test_tasks.py::test_create_task_valid_returns_201_with_full_body PASSED
+tests/test_tasks.py::test_create_task_missing_title_returns_422 PASSED
+...
+28 passed in 0.XX s
+
+### Saving a test baseline
+
+To run tests and save the results to a file for comparison:
+
+**Windows PowerShell:**
+```powershell
+pytest -v 2>&1 | Tee-Object -FilePath "baseline_test_results.txt"
+```
+
+**macOS/Linux:**
+```bash
+pytest -v | tee baseline_test_results.txt
+```
+
 
 ## Project Status
 
