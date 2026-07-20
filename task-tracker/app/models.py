@@ -59,6 +59,19 @@ class TaskCreate(BaseModel):
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: str) -> str:
+        """Validate and normalize a task title.
+
+        Args:
+            value (str): The raw title.
+
+        Returns:
+            str: The stripped title.
+
+        Raises:
+            ValueError: If the stripped title is blank, or if it is
+                longer than 200 characters. Pydantic surfaces this
+                as part of a 422 response.
+        """
         stripped = value.strip()
         if not stripped:
             raise ValueError("title cannot be blank")
@@ -69,6 +82,21 @@ class TaskCreate(BaseModel):
     @field_validator("tags")
     @classmethod
     def validate_tags(cls, value: list[str]) -> list[str]:
+        """Normalize and validate a task's tags.
+
+        Delegates to `_normalize_tags`.
+
+        Args:
+            value (list[str]): The raw tag list.
+
+        Returns:
+            list[str]: Stripped, lowercased, deduplicated tags with
+            blank entries removed, preserving first-seen order.
+
+        Raises:
+            ValueError: If any tag exceeds 32 characters after
+                normalization, or if more than 10 tags remain.
+        """
         return _normalize_tags(value)
 
 
@@ -85,6 +113,20 @@ class TaskUpdate(BaseModel):
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: Optional[str]) -> Optional[str]:
+        """Validate and normalize an optional task title.
+
+        Args:
+            value (Optional[str]): The raw title, or None if the
+                field was not supplied in the update payload.
+
+        Returns:
+            Optional[str]: None if `value` is None, otherwise the
+            stripped title.
+
+        Raises:
+            ValueError: If a non-None value strips to blank, or is
+                longer than 200 characters.
+        """
         if value is None:
             return value
         stripped = value.strip()
@@ -97,6 +139,20 @@ class TaskUpdate(BaseModel):
     @field_validator("tags")
     @classmethod
     def validate_tags(cls, value: Optional[list[str]]) -> Optional[list[str]]:
+        """Validate and normalize an optional tag list.
+
+        Args:
+            value (Optional[list[str]]): The raw tag list, or None
+                if the field was not supplied in the update payload.
+
+        Returns:
+            Optional[list[str]]: None if `value` is None, otherwise
+            the result of `_normalize_tags(value)`.
+
+        Raises:
+            ValueError: If any tag exceeds 32 characters after
+                normalization, or if more than 10 tags remain.
+        """
         if value is None:
             return value
         return _normalize_tags(value)
