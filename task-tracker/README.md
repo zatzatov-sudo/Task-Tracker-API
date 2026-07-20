@@ -1,117 +1,36 @@
 # Task Tracker API
 
-A minimal learning-project REST API built with **FastAPI** and **Pydantic**, using a local JSON file for data persistence (see ADR-001). This project focuses on learning REST API development, request validation, and application structure — not database technologies.
+## 1. Project Overview
 
-## Tech Stack
+A learning-project REST API built with **FastAPI** and **Pydantic**, plus a single-file vanilla JS/HTML Kanban frontend. Task data lives in an **in-memory** dictionary for the lifetime of the server process — there is no database and no file-based persistence; all data resets on every restart and before/after every test run.
 
-- Python
-- FastAPI
-- Pydantic
-- Uvicorn
-- Local JSON file (`tasks.json`) for persistence (added in a later step)
-- HTML/CSS/JavaScript frontend using the Fetch API (added in a later step)
+Implemented functionality:
+- Full task CRUD: `POST /tasks`, `GET /tasks`, `GET /tasks/{id}`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`
+- Status-transition validation on `PATCH` (`ToDo → InProgress → Done → InProgress`; same-status and skip-ahead transitions rejected with 422)
+- Tags (up to 10 per task, 32 chars each, normalized) and free-text search across `title`/`description`
+- All list filters (`status`, `priority`, `tag`, `search`) combine with AND logic
+- `GET /health` liveness endpoint
+- Kanban-board frontend with drag-and-drop, optimistic updates, and a combined filter bar
 
-## Features
+This project is for learning REST API development, request validation, and application structure — **not** database technologies, authentication, or deployment. See [Current Limitations](#9-project-conventions-and-current-limitations).
 
-### Core CRUD
-- `POST /tasks` — create a task with title, description, status, priority, assignee, and tags
-- `GET /tasks` — list all tasks, with optional filters: `status`, `priority`, `tag`
-- `GET /tasks/{id}` — fetch a single task by ID
-- `PATCH /tasks/{id}` — partial update with status-transition validation
-- `DELETE /tasks/{id}` — delete a task (returns 204, no body)
+## 2. Prerequisites
 
-### Business Rules
-- Status transitions are validated: `ToDo → InProgress → Done → InProgress`
-- Same-status transitions are rejected (422)
-- Skip-ahead transitions (e.g. `ToDo → Done`) are rejected (422)
-
-### Tags/Labels
-- Tasks support up to 10 tags, each max 32 characters
-- Tags are normalized: lowercased, stripped, deduplicated
-- Filter tasks by tag via `GET /tasks?tag=bug`
-- Tag chips rendered on each card in the UI
-- Live client-side tag filter in the board header
-
-### Search + Combined Filters
-- Free-text search across task title and description via `GET /tasks?search=login`
-- All filters combinable in a single request with AND logic:
-  `GET /tasks?status=ToDo&priority=High&tag=bug&search=login`
-- Empty or whitespace-only search treated as no filter
-- Invalid enum values (`status`, `priority`) return 422 automatically
-- Frontend: compact four-input filter bar (search, status, priority, tag)
-- Filters trigger an API call on every change — server is always source of truth
-- Empty filter results show the empty state banner with columns still visible
-
-### Frontend
-- Kanban board with three columns: To Do, In Progress, Done
-- Four UI states: loading, ready, empty, error (with retry)
-- Drag-and-drop between columns with optimistic updates and rollback on rejection
-- Create/edit modal with client-side validation and server error surfacing
-- Live tag filter in the header (client-side, no extra network call)
-
-## Current Scope
-
-This skeleton currently includes:
-- Basic FastAPI application setup
-- A `GET /health` endpoint for verifying the service is running
-
-CRUD endpoints, storage logic, authentication, and the frontend are intentionally **not** included yet — they will be added in later steps.
-
-## Prerequisites
-
-- Python 3.10 or higher
-- `pip`
-
-## Setup Instructions
-
-1. Clone or download this project, then move into the project folder:
-```bash
-   cd task-tracker
-```
-
-2. Create a virtual environment:
-```bash
-   python -m venv venv
-```
-
-3. Activate the virtual environment:
-
-   - **Linux/macOS:**
-```bash
-     source venv/bin/activate
-```
-   - **Windows (PowerShell):**
-```powershell
-     venv\Scripts\Activate.ps1
-```
-
-4. Install dependencies:
-```bash
-   pip install -r requirements.txt
-```
-
-5. Copy the example environment file and adjust if needed:
-```bash
-   cp .env.example .env
-```
-   (On Windows PowerShell: `Copy-Item .env.example .env`)
-
-## How to Run the Project
-
-### Prerequisites
-
-- Python 3.10 or higher
+- Python 3.11 (matches the version pinned in `Dockerfile` and `.github/workflows/ci.yml`)
 - `pip`
 - Git
+- Docker (only needed for [Run with Docker](#6-run-with-docker))
 
-### 1. Clone the repository
+## 3. Local Setup
+
+All commands below are copy-pasteable in order from the **repository root** (the folder created by `git clone`).
 
 ```bash
 git clone https://github.com/zatzatov-sudo/Task-Tracker-API.git
-cd Task-Tracker-API
+cd Task-Tracker-API/task-tracker
 ```
 
-### 2. Create and activate a virtual environment
+Create and activate a virtual environment:
 
 **macOS/Linux:**
 ```bash
@@ -124,130 +43,118 @@ source venv/bin/activate
 python -m venv venv
 venv\Scripts\Activate.ps1
 ```
-
 > If PowerShell blocks the activation script with an execution policy error, run this once first:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
-### 3. Install dependencies
-
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Copy the environment file
-
-**macOS/Linux:**
+`.env.example` is provided (`PORT`, `APP_ENV`), but `[VERIFY]` — no code in `app/` currently reads environment variables or calls `load_dotenv()`, so copying it to `.env` is optional for running the app today:
 ```bash
-cp .env.example .env
+cp .env.example .env          # macOS/Linux
+Copy-Item .env.example .env   # Windows PowerShell
 ```
 
-**Windows PowerShell:**
-```powershell
-Copy-Item .env.example .env
-```
+## 4. Run the App Locally
 
----
-
-## Running the Backend
-
-From the project root, with the virtual environment active:
+From `task-tracker/`, with the virtual environment active:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+- API base URL: `http://127.0.0.1:8000`
+- Interactive Swagger docs: `http://127.0.0.1:8000/docs`
+- Health check: `curl http://127.0.0.1:8000/health`
 
-You should see:
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Application startup complete.
+**Frontend** (no build step — a single static file):
+- Open `frontend/index.html` directly in a browser while the backend above is running.
+- It calls the API at `http://localhost:8000` via `fetch()` (hardcoded `API_BASE_URL`); CORS is wide open (`allow_origins=["*"]`) so this works from a `file://` URL.
 
-Keep this terminal open while using the app — press `Ctrl+C` to stop the server.
+## 5. Run Tests
 
-### Verify the backend is running
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Expected response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-07-18T..."
-}
-```
-
-### Swagger UI (interactive API docs)
-
-With the server running, open your browser to:
-http://127.0.0.1:8000/docs
-
-All endpoints are listed and testable directly from the browser.
-
----
-
-## Opening the Frontend
-
-The frontend is a single static HTML file — no build step required.
-
-1. Make sure the backend is running (see above)
-2. Open this file directly in your browser:
-task-tracker/frontend/index.html
-
-**Windows:** navigate to the file in File Explorer and double-click it, or drag it into a browser tab.
-
-**macOS/Linux:**
-```bash
-open frontend/index.html
-```
-
-The Kanban board will load and fetch tasks automatically from `http://localhost:8000`.
-
-> **Note:** The frontend communicates with the backend via `fetch()`. CORS is enabled on the backend for local development, so opening the file via `file://` works without a local web server.
-
----
-
-## Running the Tests
-
-Tests use `pytest` with FastAPI's `TestClient` — no running server needed, the test client handles everything in-process.
-
-From the project root, with the virtual environment active:
-
-```bash
-pytest
-```
-
-For verbose output showing each test name and result:
+From `task-tracker/`, with the virtual environment active:
 
 ```bash
 pytest -v
 ```
 
-### Expected output
-collected 28 items
-tests/test_tasks.py::test_create_task_valid_returns_201_with_full_body PASSED
-tests/test_tasks.py::test_create_task_missing_title_returns_422 PASSED
-...
-28 passed in 0.XX s
+Tests use FastAPI's `TestClient` in-process — no server needs to be running. An autouse fixture in `tests/conftest.py` clears in-memory storage before and after every test. At the time of writing, the suite has 41 tests, all passing.
 
-### Saving a test baseline
+## 6. Run with Docker
 
-To run tests and save the results to a file for comparison:
+From `task-tracker/` (where the `Dockerfile` lives):
 
-**Windows PowerShell:**
-```powershell
-pytest -v 2>&1 | Tee-Object -FilePath "baseline_test_results.txt"
-```
-
-**macOS/Linux:**
 ```bash
-pytest -v | tee baseline_test_results.txt
+docker build -t task-tracker-api .
+docker run --rm -p 8000:8000 task-tracker-api
 ```
 
+Then verify:
+```bash
+curl http://localhost:8000/health
+```
 
-## Project Status
+Notes on the image (`Dockerfile`):
+- Multi-stage build on `python:3.11-slim`; the final image contains only installed dependencies and the `app/` package.
+- Runs as a non-root user (`app`), not root.
+- No `--reload` in the container's `CMD` (production-style invocation: `uvicorn app.main:app --host 0.0.0.0 --port 8000`).
+- No database, authentication, or deployment step is included — this module does not deploy the image anywhere.
 
-This is an early-stage skeleton (Module 1). Future modules will add task CRUD endpoints, JSON file-based storage logic, and a simple frontend.
+## 7. CI Workflow Summary
+
+`.github/workflows/ci.yml` lives at the **repository root** (outside `task-tracker/`). It:
+- Triggers on every `push` and `pull_request`
+- Uses `actions/checkout@v4` and `actions/setup-python@v5` pinned to Python `3.11`
+- Runs all steps with `working-directory: task-tracker`
+- Installs dependencies with `python -m pip install --upgrade pip` and `pip install -r requirements.txt`
+- Runs `pytest -v`
+- Does **not** contain `continue-on-error`, `|| true`, `--exit-zero`, output piping that could mask a failure, or any deployment step — a failing test fails the workflow run.
+
+## 8. Project Structure
+
+```
+Task-Tracker-API/                  (git repo root)
+├── .github/workflows/ci.yml       # CI: lives at repo root, not under task-tracker/
+└── task-tracker/                  # the actual project (this README's directory)
+    ├── app/
+    │   ├── main.py                # FastAPI app + route handlers
+    │   ├── models.py              # Pydantic schemas + field validation
+    │   ├── business_rules.py      # status-transition state machine
+    │   └── storage.py             # in-memory CRUD + filtering
+    ├── tests/
+    │   ├── conftest.py            # autouse storage-reset fixture
+    │   ├── test_tasks.py          # pytest suite (41 tests)
+    │   └── verify_a.py            # standalone ad-hoc script, not part of pytest
+    ├── frontend/
+    │   └── index.html             # single-file Kanban board (fetch API, no build step)
+    ├── docs/midcourse/            # per-feature technical notes (see section 10)
+    ├── Dockerfile
+    ├── .dockerignore
+    ├── requirements.txt
+    ├── .env.example
+    ├── CLAUDE.md                  # guidance for AI coding assistants working in this repo
+    └── README.md                  # this file
+```
+
+## 9. Project Conventions and Current Limitations
+
+- **Storage**: purely in-memory (a module-level dict in `app/storage.py`). No database, no file persistence. All data is lost on restart. `[VERIFY]` — `.gitignore` reserves `tasks.json` for "future use," but no code currently reads or writes it.
+- **No authentication or authorization.**
+- **No production deployment**: this module does not add deployment steps to the CI workflow or Docker setup, and neither should be treated as production-ready.
+- **Filtering**: `tag` accepts a single tag per request (no OR logic between multiple tags); all filters combine with AND only. See `docs/midcourse/search-combined-filters-feature.md` for the documented scope.
+- **No lint/format tooling** is configured in this repo.
+- Test naming convention: `test_<action>_<condition>_returns_<status>[_<detail>]`.
+
+## 10. Related Technical Notes
+
+No `docs/decisions/` ADR folder exists in this repo. `[VERIFY]` — the project's own tech-stack description previously referenced an "ADR-001" for JSON-file persistence, but that ADR does not exist and storage is in-memory only; that reference has been removed from this README as stale.
+
+The closest existing technical notes are per-feature write-ups in `docs/midcourse/`:
+- [`tags-feature.md`](docs/midcourse/tags-feature.md)
+- [`search-combined-filters-feature.md`](docs/midcourse/search-combined-filters-feature.md)
+- [`ci-workflow-review.md`](docs/midcourse/ci-workflow-review.md)
