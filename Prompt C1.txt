@@ -1,0 +1,25 @@
+Create .github/workflows/ci.yml for the Module 4 Task Tracker. 
+
+Project context: 
+- Python 3.11 FastAPI backend. 
+- Tests run with pytest -v. 
+- Dependencies are installed from requirements.txt. 
+- This module is not deploying the app. 
+
+Requirements: 
+- Run on push and pull_request. 
+- Use actions/checkout and actions/setup-python. 
+- Use Python 3.11, not latest or an unspecified version. 
+- Install dependencies with python -m pip install --upgrade pip and pip install -r requirements.txt. 
+- Run pytest -v. 
+- Do not include deployment steps. 
+- Do not use continue-on-error. 
+- Do not use || true. - Do not use --exit-zero. 
+- Do not hide pytest failures behind pipes or summary steps. 
+
+Constraints: 
+- Show me the diff before applying. 
+- If .github/workflows does not exist, create it at the repository root, not inside app/ or another subfolder. 
+
+Output format: 
+First summarize the workflow. Then show the YAML diff.
