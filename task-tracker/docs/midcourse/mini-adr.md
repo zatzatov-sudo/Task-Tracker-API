@@ -160,3 +160,49 @@ Use FastAPI's built‑in `HTTPException` with explicit status codes (e.g., `404`
 **Future Direction:** Introduce custom exceptions (e.g., `TaskNotFoundError`) and a global exception handler to standardize the error response format (e.g., `{"detail": "...", "code": "..."}`).
 
 ----------------------------------------------------------------------------------------------------------------
+
+## ADR‑008: Tag Storage and Normalization Strategy
+
+### Decision
+Store tags as a normalized flat list of strings (`list[str]`) directly on each task object in the in-memory dictionary. Normalization (strip whitespace, lowercase, deduplicate, drop blanks) is applied at write time via `_normalize_tags()` in `app/models.py`, so tags are always stored in a consistent format.
+
+### Alternatives Considered
+
+| Alternative | Pros | Cons |
+| :--- | :--- | :--- |
+
+| **Comma-separated string** (`"bug,frontend,urgent"`) | Compact; single field; easy to display. | Requires splitting/joining on every read and write; harder to filter; edge cases with commas in tag names. |
+
+| **Separate tags table / dict** (tag registry with IDs) | Enables tag metadata (color, description, usage count); avoids redundancy across tasks. | Significant added complexity; overkill for a learning project with no database. |
+
+| **Normalize at read time** (store raw, normalize on query) | Preserves original user input. | Every filter or comparison must re-normalize; inconsistent stored data; harder to test. |
+
+| **Case-sensitive storage** (store tags exactly as typed) | No transformation applied; simplest write path. | `"Bug"` and `"bug"` treated as different tags; confusing UX; complicates filtering. |
+
+**Current Choice:** Normalized flat list stored at write time via `_normalize_tags()` (simple, consistent, no extra dependencies).  
+**Future Direction:** If tags need metadata (colors, descriptions, reuse counts across tasks), introduce a separate tag registry. If persistence is added via JSON file, tags serialize naturally as a JSON array with no schema changes.
+
+----------------------------------------------------------------------------------------------------------------
+
+## ADR‑009: Filter Combination and Search Strategy
+
+### Decision
+Extend `GET /tasks` with a `search` query parameter that performs a case-insensitive substring match against `title` and `description`. All filters (`status`, `priority`, `tag`, `search`) are applied sequentially in `storage.get_all_tasks` with **AND logic** — a task must satisfy every provided filter to appear in results. The frontend calls `applyFilters()` on every input change, sending all active filter values as query params to the server, which is always the source of truth.
+
+### Alternatives Considered
+
+| Alternative | Pros | Cons |
+| :--- | :--- | :--- |
+
+| **OR logic between filters** | More flexible; matches more results; useful when filters are additive. | Less predictable behavior; harder to explain to users; more complex to implement correctly. |
+
+| **Client-side filtering only** (filter the already-loaded `tasks` array in JS) | No extra network call per keystroke; fast. | Stale results if tasks are added/edited in another tab; server is no longer the source of truth; inconsistent with server-side tag filter. |
+
+| **Debounced API call on search input** | Reduces network requests while typing; better performance on slow connections. | Adds implementation complexity; not necessary at this project's scale. |
+
+| **Full-text search engine** (e.g., Whoosh, Elasticsearch) | Handles stemming, relevance ranking, typo tolerance. | Heavy dependency; significant setup; overkill for a local learning project with in-memory storage. |
+
+| **Search across all fields** (title, description, assignee, tags) | More powerful; matches user expectations of a global search. | Blurs the distinction between search and tag/assignee filters; harder to explain what the search box does. |
+
+**Current Choice:** Server-side AND filtering with case-insensitive substring search across `title` and `description` only; frontend always calls the API on filter change (no client-side filtering).  
+**Future Direction:** Add debounce to the search input to reduce API calls during fast typing. Extend search to cover `assignee` if user feedback shows this is expected. Add OR logic between filter values (e.g. multiple tags) if combined filter use grows in complexity.

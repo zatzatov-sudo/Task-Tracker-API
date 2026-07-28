@@ -141,3 +141,63 @@
 - Assumption: Deletion is permanent and immediate; there is no soft‑delete or restore mechanism.  
 
 - Correction needed: In many applications, tasks are soft‑deleted (marked as deleted) to allow recovery or audit trails.
+
+
+
+**Feature: Tags/Labels**
+
+# User Stories
+
+1. Story 1: I want to attach short labels to a task when creating or editing it, so that I can quickly understand what a task is about without reading the full description.
+
+2. Story 2: I want to filter the task board by a specific tag, so that I can focus on a category of work without scrolling through everything.
+
+3. Story 3: I want tag input to be forgiving — accepting mixed case and extra spaces — so that I don't have to worry about typing tags in exactly the same format every time.
+
+4. Story 4: I want tags to appear as visual chips on each card on the Kanban board, so that I can see a task's labels at a glance without opening an edit form.
+
+# Acceptance Criteria
+
+- Criteria 1: A task can be created with up to 10 tags, each max 32 characters after normalization; violating either limit returns `422`.
+
+- Criteria 2: Tags are normalized on save (stripped + lowercased); duplicates are silently removed; blank tags are silently dropped.
+
+- Criteria 3: On `PATCH /tasks/{id}`, omitting `tags` leaves existing tags untouched; sending `tags: []` explicitly clears all tags.
+
+- Criteria 4: `GET /tasks?tag=bug` returns only matching tasks case-insensitively; no match returns `200` with `[]`, never `404`.
+
+# Flagged Assumption
+
+- Assumption: The live tag filter in the board header filters client-side on the already-loaded `tasks` array without making an additional network request.
+
+- Correction needed: This is inconsistent with the Search + Combined Filters feature, where all filters call `GET /tasks` with query params so the server is always the source of truth. The tag filter in the header should be unified with `applyFilters()` and call the API like the other filters, rather than operating on stale client-side state.
+
+
+
+**Feature: Search + Combined Filters on Tasks**
+
+# User Stories
+
+1. Story 1: I want to search for tasks by typing a word or phrase, so that I can quickly find a task without scrolling through the entire board.
+
+2. Story 2: I want to combine multiple filters (status, priority, tag, and search) in a single action, so that I can narrow down tasks to exactly what I need without running separate searches.
+
+3. Story 3: I want the board to update immediately when I change any filter, so that I get instant feedback without clicking a search button.
+
+4. Story 4: I want empty filter results to still show all three columns, so that the board layout doesn't break when nothing matches my search.
+
+# Acceptance Criteria
+
+- Criteria 1: `GET /tasks?search=login` returns all tasks where `"login"` appears anywhere in `title` or `description`, case-insensitively; an empty or whitespace-only `search` value is treated as no filter and returns the unfiltered task list.
+
+- Criteria 2: All four filters (`status`, `priority`, `tag`, `search`) can be combined freely in a single request with AND logic; a task must satisfy every provided filter to appear in results.
+
+- Criteria 3: Any combination of filters that produces no matches returns `200` with `[]`, never `404`; invalid enum values for `status` or `priority` return `422`.
+
+- Criteria 4: The frontend filter bar calls `applyFilters()` on every `input`/`change` event, building query params from the `activeFilters` state object and fetching from `GET /tasks` — the server is always the source of truth; columns remain visible in all states including empty results.
+
+# Flagged Assumption
+
+- Assumption: Search matches only `title` and `description`; assignee and tag text are not included in the free-text search because tags have their own dedicated filter param.
+
+- Correction needed: A user typing in the search box might reasonably expect it to also match assignee names. The current implementation would silently return no results for that query even though matching data exists. The search scope should either be extended to include `assignee`, or the UI should clearly communicate that search covers title and description only.
